@@ -1,0 +1,644 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="HSK 1">
+<meta name="theme-color" content="#0f0f0f">
+<title>HSK 1 Flashcards</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;600&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:#0f0f0f;--surface:#1a1a1a;--surface2:#242424;
+    --border:rgba(255,255,255,0.08);--text:#f0ece4;
+    --muted:rgba(240,236,228,0.45);--hint:rgba(240,236,228,0.22);
+    --accent:#c8a96e;--green:#5fbe8a;--green-dim:rgba(95,190,138,0.12);
+    --red:#e06868;--red-dim:rgba(224,104,104,0.12);--blue:#6ba3d6;
+    --flip-duration:0.55s;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+  html,body{height:100%;height:100dvh;background:var(--bg);color:var(--text);
+    font-family:'DM Sans',sans-serif;overflow:hidden;touch-action:manipulation}
+  .app{display:flex;flex-direction:column;height:100dvh;max-width:500px;margin:0 auto;
+    padding:env(safe-area-inset-top,16px) 20px env(safe-area-inset-bottom,20px)}
+  .header{display:flex;align-items:center;justify-content:space-between;padding:10px 0 8px}
+  .header-title{font-size:13px;font-weight:500;letter-spacing:.12em;text-transform:uppercase;color:var(--accent)}
+  .header-counts{font-size:13px;color:var(--muted)}
+  .header-counts span{color:var(--text);font-weight:500}
+  .progress-track{height:2px;background:var(--border);border-radius:99px;margin-bottom:12px;overflow:hidden}
+  .progress-fill{height:100%;background:var(--accent);border-radius:99px;transition:width .5s ease}
+  .stats-row{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:12px}
+  .stat-pill{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:8px 4px;text-align:center}
+  .stat-pill .n{font-size:18px;font-weight:500}
+  .stat-pill .l{font-size:10px;color:var(--muted);margin-top:2px;letter-spacing:.04em}
+  .n-new{color:var(--blue)}.n-learn{color:var(--accent)}.n-known{color:var(--green)}.n-due{color:var(--red)}
+  .scene{flex:1;perspective:1400px;margin-bottom:12px;min-height:0}
+
+  .card{width:100%;height:100%;transform-style:preserve-3d;
+    transition:transform var(--flip-duration) cubic-bezier(.4,0,.2,1);position:relative}
+  .card.flipped{transform:rotateY(180deg)}
+
+  .face{position:absolute;inset:0;backface-visibility:hidden;-webkit-backface-visibility:hidden;
+    border-radius:20px;border:1px solid var(--border);background:var(--surface);
+    display:flex;flex-direction:column;align-items:center;justify-content:center;
+    padding:2rem 1.5rem;overflow:hidden}
+  .face::before{content:'';position:absolute;inset:0;
+    background:radial-gradient(ellipse 80% 50% at 50% 0%,rgba(200,169,110,.07),transparent 65%);
+    pointer-events:none}
+  .face.back{transform:rotateY(180deg)}
+
+  /* Speaker button — back face only */
+  .speak-btn{
+    position:absolute;top:14px;left:16px;
+    width:38px;height:38px;border-radius:50%;
+    border:1px solid var(--border);background:var(--surface2);
+    display:flex;align-items:center;justify-content:center;
+    cursor:pointer;transition:background .15s,transform .1s;
+    color:var(--muted);
+  }
+  .speak-btn:active{transform:scale(.9);background:var(--surface)}
+  .speak-btn.speaking{color:var(--accent);border-color:rgba(200,169,110,.4)}
+  .speak-btn svg{width:18px;height:18px;fill:currentColor;flex-shrink:0}
+
+  /* Back content fades in after flip */
+  .back-content{display:flex;flex-direction:column;align-items:center;opacity:0}
+  .card.revealed .back-content{opacity:1;transition:opacity .2s ease}
+
+  .char{font-family:'Noto Serif SC',serif;font-size:clamp(68px,17vw,108px);font-weight:600;line-height:1;margin-bottom:12px}
+  .tap-hint{font-size:12px;color:var(--hint);letter-spacing:.1em;text-transform:uppercase;display:flex;align-items:center;gap:6px}
+  .tap-hint::before,.tap-hint::after{content:'';display:block;width:20px;height:1px;background:var(--hint)}
+  .char-small{font-family:'Noto Serif SC',serif;font-size:22px;color:var(--hint);margin-bottom:10px}
+  .pinyin{font-size:clamp(20px,5.5vw,30px);font-weight:400;color:var(--accent);letter-spacing:.04em;margin-bottom:14px;text-align:center}
+  .meaning{font-size:clamp(16px,4.2vw,21px);font-weight:400;color:var(--text);text-align:center;line-height:1.5;max-width:290px}
+  .pos-badge{margin-top:12px;font-size:11px;color:var(--muted);background:var(--surface2);
+    border:1px solid var(--border);border-radius:99px;padding:3px 10px;letter-spacing:.05em}
+
+  .swipe-overlay{position:absolute;inset:0;border-radius:20px;display:flex;align-items:center;
+    justify-content:center;font-size:56px;opacity:0;pointer-events:none;transition:opacity .15s}
+  .swipe-overlay.show{opacity:1}
+  .swipe-overlay.wrong{background:rgba(224,104,104,.28)}
+  .swipe-overlay.right{background:rgba(95,190,138,.28)}
+
+  .queue-info{text-align:center;font-size:12px;color:var(--hint);margin-bottom:6px;letter-spacing:.04em}
+  .btn{border-radius:14px;border:1px solid;padding:16px 12px;font-size:15px;font-weight:500;
+    font-family:'DM Sans',sans-serif;cursor:pointer;display:flex;align-items:center;
+    justify-content:center;gap:8px;transition:transform .1s;-webkit-appearance:none}
+  .btn:active{transform:scale(.96)}
+  .actions{display:flex;gap:10px;margin-bottom:8px}
+  .btn-wrong{flex:1;background:var(--red-dim);border-color:rgba(224,104,104,.3);color:var(--red)}
+  .btn-right{flex:1;background:var(--green-dim);border-color:rgba(95,190,138,.3);color:var(--green)}
+  .btn-flip{width:100%;padding:14px;border-radius:14px;border:1px solid var(--border);
+    background:var(--surface2);color:var(--muted);font-size:14px;cursor:pointer;
+    font-family:'DM Sans',sans-serif;margin-bottom:8px;transition:background .15s}
+  .btn-flip:active{background:var(--surface)}
+  .done-screen{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;
+    text-align:center;padding:2rem}
+  .done-emoji{font-size:52px;margin-bottom:14px}
+  .done-title{font-size:24px;font-weight:500;margin-bottom:6px}
+  .done-stats{display:flex;gap:28px;margin:16px 0 20px}
+  .done-stat .dn{font-size:28px;font-weight:500}
+  .done-stat .dl{font-size:12px;color:var(--muted)}
+  .done-sub{color:var(--muted);font-size:14px;line-height:1.6;margin-bottom:24px;max-width:270px}
+  .btn-restart{padding:15px 36px;border-radius:99px;border:1px solid var(--border);
+    background:var(--surface);color:var(--text);font-size:15px;font-weight:500;
+    cursor:pointer;font-family:'DM Sans',sans-serif}
+  .hidden{display:none!important}
+</style>
+</head>
+<body>
+<div class="app" id="app">
+  <div class="header">
+    <div class="header-title">HSK 1 · 汉字</div>
+    <div class="header-counts"><span id="pos-label">1</span> / <span id="total-label">—</span></div>
+  </div>
+  <div class="progress-track"><div class="progress-fill" id="prog" style="width:0%"></div></div>
+  <div class="stats-row">
+    <div class="stat-pill"><div class="n n-new" id="cnt-new">—</div><div class="l">New</div></div>
+    <div class="stat-pill"><div class="n n-learn" id="cnt-learn">—</div><div class="l">Learning</div></div>
+    <div class="stat-pill"><div class="n n-known" id="cnt-known">—</div><div class="l">Known</div></div>
+    <div class="stat-pill"><div class="n n-due" id="cnt-due">—</div><div class="l">Due</div></div>
+  </div>
+
+  <div id="main-view" style="display:flex;flex-direction:column;flex:1;min-height:0">
+    <div class="queue-info" id="queue-info"></div>
+    <div class="scene" id="scene">
+      <div class="card" id="card">
+
+        <!-- FRONT — no speaker -->
+        <div class="face front">
+          <div class="char" id="char">爱</div>
+          <div class="tap-hint">tap to reveal</div>
+        </div>
+
+        <!-- BACK — speaker here only -->
+        <div class="face back">
+          <button class="speak-btn" id="speak-btn" aria-label="Pronounce" onclick="event.stopPropagation();speak()">
+            <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+              <path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/>
+            </svg>
+          </button>
+          <div class="back-content" id="back-content">
+            <div class="char-small" id="char-small">爱</div>
+            <div class="pinyin" id="pinyin">ài</div>
+            <div class="meaning" id="meaning">to love</div>
+            <div class="pos-badge" id="pos-tag">verb</div>
+          </div>
+          <div class="swipe-overlay" id="swipe-overlay"></div>
+        </div>
+
+      </div>
+    </div>
+    <button class="btn-flip" id="flip-btn" onclick="flipCard()">Tap card or press here to reveal →</button>
+    <div class="actions hidden" id="actions">
+      <button class="btn btn-wrong" onclick="markCard(false)">✗ &nbsp;Didn't know</button>
+      <button class="btn btn-right" onclick="markCard(true)">✓ &nbsp;Got it!</button>
+    </div>
+  </div>
+
+  <div id="done-view" class="done-screen hidden">
+    <div class="done-emoji">🏮</div>
+    <div class="done-title">Session complete</div>
+    <div class="done-stats">
+      <div class="done-stat"><div class="dn" id="done-right" style="color:var(--green)">0</div><div class="dl">Correct</div></div>
+      <div class="done-stat"><div class="dn" id="done-pct" style="color:var(--accent)">—</div><div class="dl">Accuracy</div></div>
+      <div class="done-stat"><div class="dn" id="done-wrong" style="color:var(--red)">0</div><div class="dl">Missed</div></div>
+    </div>
+    <div class="done-sub" id="done-msg"></div>
+    <button class="btn-restart" onclick="restartSession()">Study again</button>
+  </div>
+</div>
+
+<script>
+const W=[
+["爱","ài","to love","verb"],
+["八","bā","eight","number"],
+["爸爸","bàba","dad","noun"],
+["吧","ba","(suggestion / confirmation particle)","aux"],
+["白天","báitiān","daytime","noun"],
+["百","bǎi","hundred","number"],
+["半","bàn","half","number"],
+["包子","bāozi","steamed stuffed bun","noun"],
+["杯子","bēizi","cup, glass","noun"],
+["本","běn","(measure word for books)","classifier"],
+["边","biān","side; direction suffix","noun"],
+["病","bìng","illness; to be ill","noun/verb"],
+["不","bù","not, no","adverb"],
+["不客气","bú kèqi","you're welcome","phrase"],
+["不要","búyào","don't; not want","adverb"],
+["菜","cài","vegetable, dish","noun"],
+["茶","chá","tea","noun"],
+["唱","chàng","to sing","verb"],
+["超市","chāoshì","supermarket","noun"],
+["车","chē","vehicle, car","noun"],
+["吃","chī","to eat","verb"],
+["出租车","chūzūchē","taxi","noun"],
+["穿","chuān","to wear","verb"],
+["打电话","dǎ diànhuà","to make a phone call","phrase"],
+["大","dà","big","adjective"],
+["大家","dàjiā","everyone","pronoun"],
+["大学","dàxué","university","noun"],
+["大学生","dàxuéshēng","university student","noun"],
+["到","dào","to arrive; to","verb"],
+["的","de","(possessive / modifying particle)","aux"],
+["第","dì","(ordinal number prefix)","prefix"],
+["弟弟","dìdi","younger brother","noun"],
+["点","diǎn","o'clock; point; a bit","classifier"],
+["店","diàn","shop, store","noun"],
+["电话","diànhuà","telephone, phone call","noun"],
+["电脑","diànnǎo","computer","noun"],
+["电视","diànshì","television","noun"],
+["电影","diànyǐng","movie, film","noun"],
+["电影院","diànyǐngyuàn","cinema","noun"],
+["东西","dōngxi","thing, object","noun"],
+["都","dōu","all, both","adverb"],
+["读","dú","to read","verb"],
+["读书","dúshū","to read a book","verb"],
+["对","duì","correct, right; toward","adj/prep"],
+["对不起","duìbuqǐ","sorry","phrase"],
+["多","duō","many, much","adjective"],
+["多少","duōshao","how many, how much","pronoun"],
+["儿子","érzi","son","noun"],
+["二","èr","two","number"],
+["饭","fàn","cooked rice, meal","noun"],
+["饭店","fàndiàn","restaurant","noun"],
+["房间","fángjiān","room","noun"],
+["非常","fēicháng","very, extremely","adverb"],
+["飞机","fēijī","airplane","noun"],
+["分","fēn","minute; to divide","classifier"],
+["分钟","fēnzhōng","minute","classifier"],
+["高兴","gāoxìng","happy, glad","adjective"],
+["歌","gē","song","noun"],
+["哥哥","gēge","older brother","noun"],
+["个","gè","(general measure word)","classifier"],
+["给","gěi","to give; for","verb"],
+["公司","gōngsī","company","noun"],
+["工作","gōngzuò","work; to work","noun/verb"],
+["狗","gǒu","dog","noun"],
+["贵","guì","expensive","adjective"],
+["国","guó","country","noun"],
+["还","hái","still, also, quite","adverb"],
+["孩子","háizi","child","noun"],
+["汉语","Hànyǔ","Chinese language (spoken)","noun"],
+["汉字","Hànzì","Chinese character","noun"],
+["好","hǎo","good; well","adjective"],
+["好吃","hǎochī","delicious, tasty","adjective"],
+["好看","hǎokàn","good-looking","adjective"],
+["好听","hǎotīng","pleasant to listen to","adjective"],
+["好玩儿","hǎowánr","fun, amusing","adjective"],
+["号","hào","number; date","noun"],
+["喝","hē","to drink","verb"],
+["和","hé","and, with","conjunction"],
+["很","hěn","very","adverb"],
+["后","hòu","behind, later","noun"],
+["回","huí","to return","verb"],
+["会","huì","can, to be able to","verb"],
+["火车","huǒchē","train","noun"],
+["鸡蛋","jīdàn","egg","noun"],
+["几","jǐ","how many; a few","pronoun"],
+["家","jiā","home, family","noun"],
+["家人","jiārén","family member","noun"],
+["见","jiàn","to see","verb"],
+["件","jiàn","(measure word for items/clothes)","classifier"],
+["饺子","jiǎozi","dumpling","noun"],
+["叫","jiào","to be called; to call","verb"],
+["姐姐","jiějie","older sister","noun"],
+["今年","jīnnián","this year","noun"],
+["今天","jīntiān","today","noun"],
+["九","jiǔ","nine","number"],
+["觉得","juéde","to feel, to think","verb"],
+["开","kāi","to open; to drive","verb"],
+["开车","kāichē","to drive (a car)","verb"],
+["看","kàn","to look, to watch","verb"],
+["看病","kànbìng","to see a doctor","verb"],
+["看见","kànjiàn","to see","verb"],
+["可以","kěyǐ","can, may; okay","verb"],
+["课","kè","class, lesson","noun"],
+["口","kǒu","mouth; (measure word for people)","noun"],
+["块","kuài","(measure word for pieces/money)","classifier"],
+["来","lái","to come","verb"],
+["老师","lǎoshī","teacher","noun"],
+["了","le","(completed action particle)","aux"],
+["冷","lěng","cold","adjective"],
+["里","lǐ","inside, in","noun"],
+["两","liǎng","two (of something)","number"],
+["零","líng","zero","number"],
+["六","liù","six","number"],
+["妈妈","māma","mom","noun"],
+["吗","ma","(yes/no question particle)","aux"],
+["买","mǎi","to buy","verb"],
+["卖","mài","to sell","verb"],
+["忙","máng","busy","adjective"],
+["猫","māo","cat","noun"],
+["没关系","méi guānxi","never mind, it's okay","phrase"],
+["没事","méishì","nothing's wrong; it doesn't matter","phrase"],
+["没有","méiyǒu","to not have; have not","verb"],
+["妹妹","mèimei","younger sister","noun"],
+["们","men","(plural suffix for pronouns/nouns)","suffix"],
+["米饭","mǐfàn","cooked rice","noun"],
+["面包","miànbāo","bread","noun"],
+["面条儿","miàntiáor","noodles","noun"],
+["明年","míngnián","next year","noun"],
+["明天","míngtiān","tomorrow","noun"],
+["名字","míngzi","name","noun"],
+["哪","nǎ","which","pronoun"],
+["哪个","nǎge","which one","pronoun"],
+["哪里","nǎlǐ","where","pronoun"],
+["哪儿","nǎr","where","pronoun"],
+["哪些","nǎxiē","which ones","pronoun"],
+["那","nà","that","pronoun"],
+["那边","nàbiān","over there","pronoun"],
+["那个","nàge","that one","pronoun"],
+["那里","nàlǐ","there","pronoun"],
+["那儿","nàr","there","pronoun"],
+["那些","nàxiē","those","pronoun"],
+["男","nán","male","adjective"],
+["男朋友","nánpéngyou","boyfriend","noun"],
+["呢","ne","(follow-up question particle)","aux"],
+["能","néng","can, be able to","verb"],
+["你","nǐ","you (singular)","pronoun"],
+["你好","nǐ hǎo","hello","phrase"],
+["你们","nǐmen","you (plural)","pronoun"],
+["年","nián","year","noun"],
+["您","nín","you (respectful)","pronoun"],
+["牛奶","niúnǎi","milk","noun"],
+["女","nǚ","female","adjective"],
+["女儿","nǚ'ér","daughter","noun"],
+["女朋友","nǚpéngyou","girlfriend","noun"],
+["女士","nǚshì","lady, Ms.","noun"],
+["朋友","péngyou","friend","noun"],
+["便宜","piányi","cheap, inexpensive","adjective"],
+["漂亮","piàoliang","beautiful, pretty","adjective"],
+["苹果","píngguǒ","apple","noun"],
+["七","qī","seven","number"],
+["起床","qǐchuáng","to get up","verb"],
+["千","qiān","thousand","number"],
+["前","qián","front, before","noun"],
+["钱","qián","money","noun"],
+["请","qǐng","please; to invite","verb"],
+["请问","qǐngwèn","may I ask; excuse me","verb"],
+["去","qù","to go","verb"],
+["去年","qùnián","last year","noun"],
+["热","rè","hot","adjective"],
+["人","rén","person, people","noun"],
+["认识","rènshi","to know; to recognize","verb"],
+["日","rì","day; sun","classifier"],
+["三","sān","three","number"],
+["商店","shāngdiàn","store, shop","noun"],
+["上","shàng","up, above; to go up","noun/verb"],
+["上班","shàngbān","to go to work","verb"],
+["上课","shàngkè","to attend class","verb"],
+["上午","shàngwǔ","morning (a.m.)","noun"],
+["上学","shàngxué","to go to school","verb"],
+["少","shǎo","few, little","adjective"],
+["谁","shéi","who","pronoun"],
+["什么","shénme","what","pronoun"],
+["生病","shēngbìng","to get sick","verb"],
+["十","shí","ten","number"],
+["时候","shíhou","moment, time","noun"],
+["时间","shíjiān","time","noun"],
+["事","shì","matter, thing","noun"],
+["是","shì","to be","verb"],
+["手机","shǒujī","cell phone","noun"],
+["书","shū","book","noun"],
+["书店","shūdiàn","bookstore","noun"],
+["水","shuǐ","water","noun"],
+["水果","shuǐguǒ","fruit","noun"],
+["睡","shuì","to sleep","verb"],
+["睡觉","shuìjiào","to sleep","verb"],
+["说","shuō","to speak, to say","verb"],
+["说话","shuōhuà","to talk","verb"],
+["四","sì","four","number"],
+["岁","suì","years old","classifier"],
+["他","tā","he, him","pronoun"],
+["它","tā","it","pronoun"],
+["她","tā","she, her","pronoun"],
+["他们","tāmen","they (male/mixed)","pronoun"],
+["它们","tāmen","they (things)","pronoun"],
+["她们","tāmen","they (female)","pronoun"],
+["太","tài","too, extremely","adverb"],
+["天","tiān","day","noun"],
+["天气","tiānqì","weather","noun"],
+["听","tīng","to listen","verb"],
+["听见","tīngjiàn","to hear","verb"],
+["同学","tóngxué","classmate","noun"],
+["外","wài","outside","noun"],
+["外边","wàibian","outside","noun"],
+["玩","wán","to play, to have fun","verb"],
+["晚","wǎn","late","adjective"],
+["晚饭","wǎnfàn","dinner","noun"],
+["晚上","wǎnshang","evening, night","noun"],
+["喂","wèi","hello (on the phone)","interjection"],
+["问","wèn","to ask","verb"],
+["问题","wèntí","question, problem","noun"],
+["我","wǒ","I, me","pronoun"],
+["我们","wǒmen","we, us","pronoun"],
+["五","wǔ","five","number"],
+["午饭","wǔfàn","lunch","noun"],
+["喜欢","xǐhuan","to like","verb"],
+["下","xià","down, below","noun/verb"],
+["下雨","xià yǔ","to rain","phrase"],
+["下班","xiàbān","to get off work","verb"],
+["下课","xiàkè","to finish class","verb"],
+["下午","xiàwǔ","afternoon","noun"],
+["先生","xiānsheng","Mr.; husband","noun"],
+["现在","xiànzài","now, at present","noun"],
+["想","xiǎng","to think; to want","verb"],
+["小","xiǎo","small, little","adjective"],
+["小朋友","xiǎopéngyǒu","little friend, child","noun"],
+["小时","xiǎoshí","hour","noun"],
+["小学","xiǎoxué","primary school","noun"],
+["小学生","xiǎoxuéshēng","primary school student","noun"],
+["些","xiē","some, a few","classifier"],
+["写","xiě","to write","verb"],
+["谢谢","xièxie","thank you","verb"],
+["新","xīn","new","adjective"],
+["星期","xīngqī","week","noun"],
+["星期日","xīngqīrì","Sunday","noun"],
+["星期天","xīngqītiān","Sunday","noun"],
+["休息","xiūxi","to rest","verb"],
+["学","xué","to learn, to study","verb"],
+["学生","xuéshēng","student","noun"],
+["学习","xuéxí","to study","verb"],
+["学校","xuéxiào","school","noun"],
+["雪","xuě","snow","noun"],
+["要","yào","to want; to need","verb"],
+["也","yě","also, too","adverb"],
+["一","yī","one","number"],
+["衣服","yīfu","clothes","noun"],
+["医生","yīshēng","doctor","noun"],
+["医院","yīyuàn","hospital","noun"],
+["一半","yíbàn","half","number"],
+["一下","yíxià","once; a little; briefly","adverb"],
+["椅子","yǐzi","chair","noun"],
+["一点儿","yìdiǎnr","a little, a bit","number"],
+["一些","yìxiē","some, a few","number"],
+["有","yǒu","to have; there is","verb"],
+["有的","yǒude","some (of them)","pronoun"],
+["有点儿","yǒudiǎnr","a little, slightly","adverb"],
+["有些","yǒuxiē","some; somewhat","pronoun"],
+["雨","yǔ","rain","noun"],
+["元","yuán","yuan (currency)","classifier"],
+["月","yuè","month; moon","noun"],
+["再","zài","again, then","adverb"],
+["在","zài","to be at; at","verb/prep"],
+["再见","zàijiàn","goodbye","phrase"],
+["早","zǎo","early","adjective"],
+["早饭","zǎofàn","breakfast","noun"],
+["早上","zǎoshang","morning (early)","noun"],
+["怎么","zěnme","how, why","pronoun"],
+["怎么样","zěnmeyàng","how about; what do you think","pronoun"],
+["找","zhǎo","to look for","verb"],
+["这","zhè","this","pronoun"],
+["这边","zhèbiān","here","pronoun"],
+["这个","zhège","this one","pronoun"],
+["这里","zhèlǐ","here","pronoun"],
+["这儿","zhèr","here","pronoun"],
+["这些","zhèxiē","these","pronoun"],
+["真","zhēn","really; true","adverb"],
+["正在","zhèngzài","in the process of","adverb"],
+["只","zhī","(measure word for animals/one of a pair)","classifier"],
+["知道","zhīdào","to know","verb"],
+["中国","Zhōngguó","China","noun"],
+["中文","Zhōngwén","Chinese language (written)","noun"],
+["中午","zhōngwǔ","noon, midday","noun"],
+["中学","zhōngxué","middle school","noun"],
+["中学生","zhōngxuéshēng","middle school student","noun"],
+["住","zhù","to live, to reside","verb"],
+["桌子","zhuōzi","table, desk","noun"],
+["字","zì","character, script","noun"],
+["昨天","zuótiān","yesterday","noun"],
+["坐","zuò","to sit","verb"],
+["做","zuò","to do, to make","verb"],
+["做饭","zuò fàn","to cook","verb"]
+];
+
+const KEY="hsk1_v4";
+let state={cards:[],queue:[],qIdx:0,sRight:0,sWrong:0};
+let flipped=false,txS=0,tyS=0;
+const cardEl=document.getElementById('card');
+const FLIP_MS=550;
+
+// ── Speech ───────────────────────────────────────────────
+let zhVoice=null;
+function loadVoices(){
+  const voices=speechSynthesis.getVoices();
+  zhVoice=voices.find(v=>v.lang==='zh-TW')
+         ||voices.find(v=>v.lang==='zh-CN')
+         ||voices.find(v=>v.lang.startsWith('zh'))
+         ||null;
+}
+loadVoices();
+if(speechSynthesis.onvoiceschanged!==undefined)speechSynthesis.onvoiceschanged=loadVoices;
+
+function speak(){
+  if(!window.speechSynthesis)return;
+  const text=document.getElementById('char').textContent;
+  speechSynthesis.cancel();
+  const utt=new SpeechSynthesisUtterance(text);
+  utt.lang='zh-CN';utt.rate=0.85;
+  if(zhVoice)utt.voice=zhVoice;
+  const btn=document.getElementById('speak-btn');
+  btn.classList.add('speaking');
+  utt.onend=()=>btn.classList.remove('speaking');
+  utt.onerror=()=>btn.classList.remove('speaking');
+  speechSynthesis.speak(utt);
+}
+
+// ── SRS ──────────────────────────────────────────────────
+function today(){return Math.floor(Date.now()/86400000)}
+
+function load(){
+  try{
+    const s=JSON.parse(localStorage.getItem(KEY)||"null");
+    if(s&&s.cards&&s.cards.length===W.length)state.cards=s.cards;
+    else initCards();
+  }catch{initCards();}
+  buildQueue();renderStats();showNext();
+}
+function initCards(){
+  state.cards=W.map((_,i)=>({id:i,interval:0,ease:2.5,due:0,bucket:0}));
+}
+function save(){try{localStorage.setItem(KEY,JSON.stringify({cards:state.cards}));}catch{}}
+function shuffle(a){
+  const r=[...a];
+  for(let i=r.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[r[i],r[j]]=[r[j],r[i]];}
+  return r;
+}
+function buildQueue(){
+  const t=today();
+  const due=shuffle(state.cards.filter(c=>c.bucket>0&&c.due<=t).map(c=>c.id));
+  const newC=shuffle(state.cards.filter(c=>c.bucket===0).map(c=>c.id)).slice(0,Math.max(20,30-due.length));
+  let q=[...due,...newC];
+  if(!q.length)q=shuffle(state.cards.map(c=>c.id)).slice(0,20);
+  state.queue=q;state.qIdx=0;state.sRight=0;state.sWrong=0;
+}
+function renderStats(){
+  const t=today();
+  document.getElementById('cnt-new').textContent=state.cards.filter(c=>c.bucket===0).length;
+  document.getElementById('cnt-learn').textContent=state.cards.filter(c=>c.bucket>0&&c.bucket<3).length;
+  document.getElementById('cnt-known').textContent=state.cards.filter(c=>c.bucket>=3).length;
+  document.getElementById('cnt-due').textContent=state.cards.filter(c=>c.bucket>0&&c.due<=t).length;
+  const pct=Math.round((state.qIdx/Math.max(state.queue.length,1))*100);
+  document.getElementById('prog').style.width=pct+'%';
+  document.getElementById('pos-label').textContent=Math.min(state.qIdx+1,state.queue.length);
+  document.getElementById('total-label').textContent=state.queue.length;
+  const dN=state.cards.filter(c=>c.bucket>0&&c.due<=t).length;
+  const nN=state.cards.filter(c=>c.bucket===0).length;
+  document.getElementById('queue-info').textContent=dN>0?`${dN} due · ${nN} new`:`${nN} new cards`;
+}
+function showNext(){
+  speechSynthesis.cancel();
+  flipped=false;
+  cardEl.style.transition='none';
+  cardEl.classList.remove('flipped','revealed');
+  cardEl.offsetHeight;
+  cardEl.style.transition='';
+  document.getElementById('actions').classList.add('hidden');
+  document.getElementById('flip-btn').classList.remove('hidden');
+  document.getElementById('swipe-overlay').className='swipe-overlay';
+  document.getElementById('speak-btn').classList.remove('speaking');
+  if(state.qIdx>=state.queue.length){showDone();return;}
+  const w=W[state.queue[state.qIdx]];
+  document.getElementById('char').textContent=w[0];
+  document.getElementById('char-small').textContent=w[0];
+  document.getElementById('pinyin').textContent=w[1];
+  document.getElementById('meaning').textContent=w[2];
+  document.getElementById('pos-tag').textContent=w[3];
+  renderStats();
+}
+function flipCard(){
+  if(flipped)return;
+  flipped=true;
+  cardEl.classList.add('flipped');
+  setTimeout(()=>{
+    cardEl.classList.add('revealed');
+    document.getElementById('flip-btn').classList.add('hidden');
+    document.getElementById('actions').classList.remove('hidden');
+  },FLIP_MS);
+}
+function markCard(correct){
+  const id=state.queue[state.qIdx];
+  const c=state.cards[id];
+  const t=today();
+  if(correct){
+    state.sRight++;
+    c.bucket=Math.min((c.bucket||0)+1,5);
+    c.interval=c.interval<1?1:c.interval<3?3:Math.round(c.interval*c.ease);
+    c.ease=Math.min(c.ease+0.1,3.0);c.due=t+c.interval;
+  }else{
+    state.sWrong++;
+    c.bucket=Math.max((c.bucket||0)-1,0);
+    c.interval=1;c.ease=Math.max(c.ease-0.2,1.3);c.due=t;
+    state.queue.push(id);
+  }
+  state.qIdx++;save();
+  const ol=document.getElementById('swipe-overlay');
+  ol.className='swipe-overlay show '+(correct?'right':'wrong');
+  ol.textContent=correct?'✓':'✗';
+  setTimeout(showNext,320);
+}
+function showDone(){
+  document.getElementById('main-view').style.display='none';
+  document.getElementById('done-view').classList.remove('hidden');
+  const r=state.sRight,w=state.sWrong,t=r+w;
+  document.getElementById('done-right').textContent=r;
+  document.getElementById('done-wrong').textContent=w;
+  document.getElementById('done-pct').textContent=t>0?Math.round(r/t*100)+'%':'—';
+  const known=state.cards.filter(c=>c.bucket>=3).length;
+  document.getElementById('done-msg').textContent=`You've mastered ${known} of ${W.length} HSK 1 words. Come back tomorrow to keep your streak!`;
+}
+function restartSession(){
+  document.getElementById('main-view').style.display='';
+  document.getElementById('done-view').classList.add('hidden');
+  buildQueue();renderStats();showNext();
+}
+
+document.getElementById('scene').addEventListener('click',e=>{
+  if(e.target.closest('.speak-btn'))return;
+  if(!flipped)flipCard();
+});
+document.getElementById('scene').addEventListener('touchstart',e=>{
+  if(e.target.closest('.speak-btn'))return;
+  txS=e.touches[0].clientX;tyS=e.touches[0].clientY;
+},{passive:true});
+document.getElementById('scene').addEventListener('touchend',e=>{
+  if(e.target.closest('.speak-btn'))return;
+  if(!flipped){flipCard();return;}
+  const dx=e.changedTouches[0].clientX-txS,dy=e.changedTouches[0].clientY-tyS;
+  if(Math.abs(dx)>Math.abs(dy)&&Math.abs(dx)>50)markCard(dx>0);
+},{passive:true});
+document.addEventListener('keydown',e=>{
+  if(e.key==='p'||e.key==='P'){if(flipped)speak();return;}
+  if((e.key===' '||e.key==='Enter')&&!flipped){e.preventDefault();flipCard();}
+  if(e.key==='ArrowRight'&&flipped)markCard(true);
+  if(e.key==='ArrowLeft'&&flipped)markCard(false);
+});
+
+load();
+</script>
+</body>
+</html>
